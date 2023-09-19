@@ -1,0 +1,17 @@
+{
+  "name": "@actors/air-purifier",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "author": "Iori Ichinose",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && ts-node index.ts"
+  },
+  "dependencies": {
+    "ws": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.5"
+  }
+}

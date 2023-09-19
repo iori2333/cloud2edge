@@ -1,0 +1,51 @@
+actors: 2.5.0
+info:
+  title: org.i2ec:air-purifier
+  version: 0.1.0
+servers:
+  ditto:
+    url: http://localhost:8080/ws/2
+    protocol: ws
+states:
+  off:
+    power:
+      message:
+        $ref: '#/components/messages/power'
+  on:
+    power:
+      message:
+        $ref: '#/components/messages/power'
+    query_state:
+      message:
+        $ref: '#/components/messages/query_state'
+      response:
+        $ref: '#/components/messages/query_state_response'
+components:
+  messages:
+    power:
+      description: Power on/off the device
+      payload:
+        type: object
+        additionalProperties: false
+        properties:
+          power:
+            type: string
+    query_state:
+      description: Query device state
+      payload:
+        type: object
+        additionalProperties: false
+        properties:
+          fields:
+            type: array
+            items:
+              type: string
+    query_state_response:
+      description: Response to query state
+      payload:
+        type: object
+        properties:
+          aqi:
+            type: number
+          pm25:
+            type: number

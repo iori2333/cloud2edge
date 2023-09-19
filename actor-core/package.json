@@ -1,0 +1,26 @@
+{
+  "name": "@actors/core",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup"
+  },
+  "devDependencies": {
+    "@types/async": "^3.2.20",
+    "@types/node": "^20.5.8",
+    "@types/ws": "^8.5.5",
+    "@typescript-eslint/eslint-plugin": "^6.6.0",
+    "@typescript-eslint/parser": "^6.6.0",
+    "eslint": "^8.48.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.3",
+    "tsup": "^7.2.0",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "async": "^3.2.4",
+    "ws": "^8.14.1"
+  }
+}
