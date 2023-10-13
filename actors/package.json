@@ -16,10 +16,12 @@
     "led:start": "node dist/led/index.js"
   },
   "dependencies": {
-    "@actors/core": "file:../actor-core"
+    "@actors/core": "file:../actor-core",
+    "ws": "^8.13.0"
   },
   "devDependencies": {
     "@types/node": "^20.5.8",
+    "@types/ws": "^8.5.5",
     "@typescript-eslint/eslint-plugin": "^6.6.0",
     "@typescript-eslint/parser": "^6.6.0",
     "eslint": "^8.48.0",

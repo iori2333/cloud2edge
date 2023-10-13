@@ -3,12 +3,14 @@ import async from "async";
 
 import { DittoProtocol, Message } from "./messages";
 import { Future } from "../utils";
+import { Transition } from "./transition";
 
 export abstract class Actor<S extends string> {
   protected thingId: string;
   protected conn: WebSocket;
   protected queue: async.QueueObject<Message>;
   protected state: S;
+  protected transitions: Map<S, Transition<S>[]>;
   protected listener: (data: RawData, isBinary: boolean) => void;
   private futureStore = new Map<string, Future<any>>();
 
@@ -26,6 +28,7 @@ export abstract class Actor<S extends string> {
     }, 1);
 
     this.state = defaultState;
+    this.transitions = new Map();
     this.listener = (rawData, isBinary) => {
       if (isBinary) {
         return;
@@ -77,7 +80,16 @@ export abstract class Actor<S extends string> {
     return promise;
   }
 
-  protected abstract handleMessage(topic: string, msg: Message): S;
+  protected handleMessage(topic: string, msg: Message): S {
+    const transitions = this.transitions.get(this.state) ?? [];
+    for (const transition of transitions) {
+      if (transition.accept(topic, msg)) {
+        transition.handle(msg);
+        return transition.to;
+      }
+    }
+    return this.handleUnknownMessage(msg);
+  }
 
   protected handleUnknownMessage(msg: Message): S {
     console.log(`Received unknown message: ${msg.topic}`);
@@ -85,4 +97,11 @@ export abstract class Actor<S extends string> {
   }
 
   protected onStart(): void {}
+
+  addTransition(transition: Transition<S>) {
+    if (!this.transitions.has(transition.from)) {
+      this.transitions.set(transition.from, []);
+    }
+    this.transitions.get(transition.from)!.push(transition);
+  }
 }

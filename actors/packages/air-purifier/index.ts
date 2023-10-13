@@ -2,9 +2,9 @@ import { WebSocket } from "ws";
 
 import {
   Message,
-  LIVE_COMMAND,
   Actor as BaseActor,
-  MessageBuilder
+  MessageBuilder,
+  Transition
 } from "@actors/core";
 
 type ActorState = "Off" | "On" | "Error";
@@ -20,6 +20,12 @@ interface Info {
 class Actor extends BaseActor<ActorState> {
   constructor(thingId: string, conn: WebSocket) {
     super(thingId, conn, DEFAULT_STATE);
+    this.addTransition(new Transition("power", "On", "Off"));
+    this.addTransition(new Transition("power", "Off", "On"));
+    this.addTransition(new Transition("power", "Error", "Off"));
+    this.addTransition(
+      new Transition("query_state", "On", "On", this.queryState.bind(this))
+    );
   }
 
   protected override onStart(): void {
@@ -27,13 +33,13 @@ class Actor extends BaseActor<ActorState> {
       const msg = new MessageBuilder()
         .withDevice("org.i2ec:led-indicator")
         .withMessageName("update")
-        .withPayload({ aqi: this.info.aqi })
+        .withPayload({ aqi: this.read_info().aqi })
         .build();
-      this.tell(msg);
+      this.ask(msg).then(r => console.log(r));
     }, 5000);
   }
 
-  private get info(): Info {
+  private read_info(): Info {
     return {
       aqi: Math.random() * 50 + 75,
       co2: Math.random() * 50 + 75,
@@ -42,97 +48,25 @@ class Actor extends BaseActor<ActorState> {
     };
   }
 
-  protected override handleMessage(topic: string, msg: Message): ActorState {
-    switch (this.state) {
-      case "Off":
-        return this.onStateOff(topic, msg);
-      case "On":
-        return this.onStateOn(topic, msg);
-      case "Error":
-        return this.onStateError(topic, msg);
-      default:
-        return this.handleUnknownMessage(msg);
+  private queryState(msg: Message): void {
+    const payload: { fields: string[] } = msg.value;
+
+    const send: Partial<Info> = {};
+    const info = this.read_info();
+    for (const field of payload.fields) {
+      if (field in info) {
+        const field_ = field as keyof Info;
+        send[field_] = info[field_];
+      }
     }
-  }
 
-  private onStateOff(topic: string, msg: Message): ActorState {
-    switch (topic) {
-      case LIVE_COMMAND + "power": {
-        const payload: { power: "on" | "off" } = msg.value;
-        if (payload.power == "on") {
-          return "On";
-        }
-        break;
-      }
-      default:
-        this.handleUnknownMessage(msg);
-    }
-    return this.state;
-  }
-
-  private onStateOn(topic: string, msg: Message): ActorState {
-    switch (topic) {
-      case LIVE_COMMAND + "power": {
-        const payload: { power: "on" | "off" } = msg.value;
-
-        if (payload.power == "off") {
-          return "Off";
-        }
-
-        break;
-      }
-      case LIVE_COMMAND + "query_state": {
-        const payload: { fields: string[] } = msg.value;
-
-        const send: Partial<Info> = {};
-        for (const field of payload.fields) {
-          const info = this.info;
-          if (field in info) {
-            const field_ = field as keyof Info;
-            send[field_] = info[field_];
-          }
-        }
-
-        const resp = msg.respond(send, 200);
-        this.tell(resp);
-        break;
-      }
-      default:
-        this.handleUnknownMessage(msg);
-    }
-    return this.state;
-  }
-
-  private onStateError(topic: string, msg: Message): ActorState {
-    switch (topic) {
-      case LIVE_COMMAND + "power": {
-        const payload: { power: "on" | "off" } = msg.value;
-
-        if (payload.power == "off") {
-          return "Off";
-        }
-        if (payload.power == "on") {
-          return "On";
-        }
-
-        break;
-      }
-      case LIVE_COMMAND + "query_state": {
-        const payload: { fields: string[] } = msg.value;
-
-        const resp = msg.respond("Error!", 200);
-        this.tell(resp);
-        break;
-      }
-      default:
-        this.handleUnknownMessage(msg);
-    }
-    return this.state;
+    const resp = msg.respond(send, 200);
+    this.tell(resp);
   }
 }
 
 function main() {
-  const ws = new WebSocket("ws://ditto:ditto@localhost:32747/ws/2");
+  const ws = new WebSocket("ws://ditto:ditto@localhost:31181/ws/2");
 
   ws.on("error", err => {
     console.log(`Failed to connect: ${err}`);

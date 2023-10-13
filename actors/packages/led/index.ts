@@ -1,6 +1,6 @@
 import { WebSocket } from "ws";
 
-import { Message, LIVE_COMMAND, Actor as BaseActor } from "@actors/core";
+import { Message, Actor as BaseActor, Transition } from "@actors/core";
 
 type ActorState = "Default";
 const DEFAULT_STATE: ActorState = "Default";
@@ -8,35 +8,23 @@ const DEFAULT_STATE: ActorState = "Default";
 export class Actor extends BaseActor<ActorState> {
   constructor(thingId: string, conn: WebSocket) {
     super(thingId, conn, DEFAULT_STATE);
+    this.addTransition(
+      new Transition("update", "Default", "Default", this.update.bind(this))
+    );
   }
 
   private setLed(on: boolean): void {
     console.log(`LED is ${on ? "on" : "off"}.`);
   }
 
-  protected override handleMessage(topic: string, msg: Message): ActorState {
-    switch (this.state) {
-      case "Default":
-        return this.onStateDefault(topic, msg);
-      default:
-        return this.handleUnknownMessage(msg);
-    }
-  }
-
-  private onStateDefault(topic: string, msg: Message): ActorState {
-    switch (topic) {
-      case LIVE_COMMAND + "update": {
-        const payload: { aqi: number } = msg.value;
-        this.setLed(payload.aqi > 100);
-        return this.state;
-      }
-    }
-    return this.state;
+  private update(msg: Message): void {
+    const payload: { aqi: number } = msg.value;
+    this.setLed(payload.aqi > 100);
   }
 }
 
 function main() {
-  const ws = new WebSocket("ws://ditto:ditto@localhost:32747/ws/2");
+  const ws = new WebSocket("ws://ditto:ditto@localhost:31181/ws/2");
 
   ws.on("error", err => {
     console.log(`Failed to connect: ${err}`);

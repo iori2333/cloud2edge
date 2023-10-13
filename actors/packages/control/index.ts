@@ -14,23 +14,6 @@ class Actor extends BaseActor<ActorState> {
     this.app = Express();
   }
 
-  protected override handleMessage(topic: string, msg: Message): ActorState {
-    switch (this.state) {
-      case "Default":
-        return this.onStateDefault(topic, msg);
-      default:
-        return this.handleUnknownMessage(msg);
-    }
-  }
-
-  private onStateDefault(topic: string, msg: Message): ActorState {
-    switch (topic) {
-      default:
-        this.handleUnknownMessage(msg);
-    }
-    return this.state;
-  }
-
   protected override onStart(): void {
     this.app.get("/start", (req, res) => {
       const msg = new MessageBuilder()
@@ -62,7 +45,7 @@ class Actor extends BaseActor<ActorState> {
 }
 
 function main() {
-  const ws = new WebSocket("ws://ditto:ditto@localhost:32747/ws/2");
+  const ws = new WebSocket("ws://ditto:ditto@localhost:31181/ws/2");
 
   ws.on("error", err => {
     console.log(`Failed to connect: ${err}`);
