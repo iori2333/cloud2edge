@@ -1,0 +1,10 @@
+# generate a nodejs docker image, running dist/index.js
+FROM node:alpine
+
+# Copy src files of app_name
+COPY ./dist/air-purifier/index.js /app/
+
+# Create app directory
+WORKDIR /app
+
+ENTRYPOINT [ "node", "/app/index.js" ]

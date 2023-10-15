@@ -45,7 +45,7 @@ class Actor extends BaseActor<ActorState> {
 }
 
 function main() {
-  const ws = new WebSocket("ws://ditto:ditto@localhost:31181/ws/2");
+  const ws = new WebSocket("ws://ditto:ditto@localhost:32728/ws/2");
 
   ws.on("error", err => {
     console.log(`Failed to connect: ${err}`);

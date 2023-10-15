@@ -12,7 +12,9 @@
   "scripts": {
     "build": "tsup",
     "air-purifier:start": "node dist/air-purifier/index.js",
+    "air-purifier:deploy": "tsup && docker build -f deployment/air-purifier . -t org.i2ec/cpsdt/air-purifier",
     "control:start": "node dist/control/index.js",
+    "control:deploy": "tsup && docker build -f deployment/control . -t org.i2ec/cpsdt/control",
     "led:start": "node dist/led/index.js"
   },
   "dependencies": {
