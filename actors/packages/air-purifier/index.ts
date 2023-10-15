@@ -1,72 +1,74 @@
 import { WebSocket } from "ws";
+import * as miio from "miio-api";
 
-import {
-  Message,
-  Actor as BaseActor,
-  MessageBuilder,
-  Transition
-} from "@actors/core";
+import { Message, Actor as BaseActor, Transition } from "@actors/core";
 
-type ActorState = "Off" | "On" | "Error";
+type ActorState = "Off" | "On";
 const DEFAULT_STATE: ActorState = "Off";
 
-interface Info {
-  aqi: number;
-  co2: number;
+type Info = {
+  power: "on" | "off";
+  led: "on" | "off";
   humidity: number;
-  pm25: number;
-}
+  aqi: number;
+};
+type Prop = keyof Info;
 
 class Actor extends BaseActor<ActorState> {
-  constructor(thingId: string, conn: WebSocket) {
+  device: miio.Device;
+
+  constructor(device: miio.Device, thingId: string, conn: WebSocket) {
     super(thingId, conn, DEFAULT_STATE);
-    this.addTransition(new Transition("power", "On", "Off"));
-    this.addTransition(new Transition("power", "Off", "On"));
-    this.addTransition(new Transition("power", "Error", "Off"));
+    this.device = device;
+    this.addTransition(
+      new Transition("power", "On", "Off", this.powerOff.bind(this))
+    );
+    this.addTransition(new Transition("power", "Off", "On", this.powerOn.bind(this)));
     this.addTransition(
       new Transition("query_state", "On", "On", this.queryState.bind(this))
     );
   }
 
-  protected override onStart(): void {
-    setInterval(() => {
-      const msg = new MessageBuilder()
-        .withDevice("org.i2ec:led-indicator")
-        .withMessageName("update")
-        .withPayload({ aqi: this.read_info().aqi })
-        .build();
-      this.ask(msg).then(r => console.log(r));
-    }, 5000);
+  protected override onStart(): void { }
+
+  private async read_info(): Promise<Info> {
+    const properties: Prop[] = ["power", "aqi", "humidity", "led"];
+    const r = await this.device.call<Prop[], any>("get_prop", properties);
+    return {
+      power: r[0],
+      aqi: r[1],
+      humidity: r[2],
+      led: r[3]
+    };
   }
 
-  private read_info(): Info {
-    return {
-      aqi: Math.random() * 50 + 75,
-      co2: Math.random() * 50 + 75,
-      humidity: Math.random() * 50 + 75,
-      pm25: Math.random() * 50 + 75
-    };
+  private powerOn(): void {
+    this.device.call("set_power", ["on"]);
+  }
+
+  private powerOff(): void {
+    this.device.call("set_power", ["off"]);
   }
 
   private queryState(msg: Message): void {
     const payload: { fields: string[] } = msg.value;
 
-    const send: Partial<Info> = {};
-    const info = this.read_info();
-    for (const field of payload.fields) {
-      if (field in info) {
-        const field_ = field as keyof Info;
-        send[field_] = info[field_];
-      }
-    }
+    this.read_info().then(info => {
+      const send: Record<string, any> = {};
 
-    const resp = msg.respond(send, 200);
-    this.tell(resp);
+      for (const field of payload.fields) {
+        if (field in info) {
+          send[field] = info[field as Prop];
+        }
+      }
+      const resp = msg.respond(send, 200);
+      this.tell(resp);
+    });
   }
 }
 
 function main() {
-  const ws = new WebSocket("ws://ditto:ditto@localhost:31181/ws/2");
+  const ws = new WebSocket("ws://ditto:ditto@localhost:32728/ws/2");
 
   ws.on("error", err => {
     console.log(`Failed to connect: ${err}`);
@@ -82,8 +84,16 @@ function main() {
     console.log(`Connection closed: ${code}, ${reason.toString()}`);
   });
 
-  const actor = new Actor("org.i2ec:air-purifier", ws);
-  actor.start();
+  miio
+    .device({
+      address: "192.168.28.233",
+      token: "57a6add53a0326b4cee51ed5aa5c7cb9"
+    })
+    .then(device => {
+      const actor = new Actor(device, "org.i2ec:air-purifier", ws);
+      actor.start();
+    })
+    .catch(err => console.log(err));
 }
 
 main();
