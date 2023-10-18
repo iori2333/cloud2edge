@@ -109,7 +109,7 @@ module Mirage_websocket
       Logs.debug (fun m -> m "Received frame: %s" @@ Frame.show frame);
       match frame.opcode with
       | Opcode.Close -> connection_error "connection closed"
-      | Opcode.Text -> handler frame.content
+      | Opcode.Text -> Logs.app (fun m -> m "%s" frame.content);handler frame.content
       | Opcode.Ping -> make_pong_frame frame.content |> write conn
       | _ ->
         Logs.debug (fun m -> m "Received unknown frame");
@@ -181,11 +181,24 @@ module Message = struct
     path = Stringext.replace_all msg.path ~pattern:"inbox" ~with_:"outbox";
     status = Some status
   }
+
+  let topic msg = msg.topic
+  let path msg = msg.path
+  let value msg = msg.value
+  let corr_id msg = msg.corr_id
+  let status msg = msg.status
+
+  let short_topic msg =
+    let rec last_item = function
+    | [] -> failwith "Empty list"
+    | [a] -> a
+    | _ :: t -> last_item t 
+    in
+    msg.topic |> String.split_on_char '/' |> last_item
 end
 
 module Actor = struct
   module Store = Map.Make (String)
-
   type state = [
     `Default | `Others
   ]
@@ -233,42 +246,41 @@ module Actor = struct
     check_reply s msg |> function
     | store, true -> {s with store}, None
     | _, false ->
-      if check_prefix s.name msg.topic then
-        let rec last_item = function
-        | [] -> failwith "Empty list"
-        | [a] -> a
-        | _ :: t -> last_item t in
-        let topic = msg.topic |> String.split_on_char '/' |> last_item in
-        s, Some (topic, msg)
+      if check_prefix s.name msg.topic then s, Some (msg)
       else s, None
 
-  let on_default_update s msg =
-    Logs.app (fun m -> m "Received message: %s" @@ Message.to_string msg);
-    `String "updated" |> Message.respond msg |> tell s
-    >>= fun() -> Lwt.return {s with state = `Default}
-
-  let on_unknown s topic msg =
-    Logs.app (fun m -> m "Received unknown message: %s %s" topic @@ Message.to_string msg);
+  let on_unknown s msg =
+    let topic = Message.short_topic msg in
+    let msg = Message.to_string msg in
+    Logs.app (fun m -> m "Received unknown message: %s %s" topic msg);
     Lwt.return s
+end
 
-  let handle s topic msg = match s.state, topic with
-  | `Default, "update" -> on_default_update s msg
-  | _ -> on_unknown s topic msg
+module Transition = struct
+  type t = {
+    topic: string;
+    from: Actor.state;
+    to_: Actor.state;
+    guard: (Actor.t -> Message.t -> bool) option;
+    action: (Actor.t -> Message.t -> Actor.t Lwt.t) option;
+  }
 
-  let on_start s =
-    Logs.app (fun m -> m "Starting %s" !s.name);
-    Lwt.return_unit
+  let create ?guard ?action topic from to_ = {
+    topic; from; to_; guard; action
+  }
 
-  let make_handler name send =
-    let store = Store.empty in
-    let state = create store name send |> ref in
-    let update raw_msg = check !state raw_msg |> function
-    | s, Some (topic, msg) ->
-      handle s topic msg >|= fun s -> state := s
-    | s, None ->
-      state := s; Lwt.return_unit
-    in
-    on_start state >|= fun() -> update
+  let accept t s msg =
+    let b1 = Actor.state s == t.from in
+    let b2 = String.equal (Message.short_topic msg) t.topic in
+    let b3 = match t.guard with
+    | None -> true
+    | Some guard -> guard s msg
+  in b1 && b2 && b3
+
+  let handle t s msg =
+    match t.action with
+    | None -> Lwt.return {s with Actor.state = t.to_}
+    | Some action -> action s msg >|= fun s -> {s with Actor.state = t.to_}
 end
 
 module Client
@@ -276,7 +288,7 @@ module Client
   (Res: Resolver_mirage.S)
   (Conn : Conduit_mirage.S)
 = struct
-  module WS = Mirage_websocket (P) (Res) (Conn)
+  module WS = Mirage_websocket (P) (Res) (Conn)  
 
   let auth_of auth_str = String.split_on_char ':' auth_str |> function
   | [auth] -> `Other auth
@@ -286,11 +298,37 @@ module Client
   let with_auth auth_str headers = auth_of auth_str |>
     Cohttp.Header.add_authorization headers
 
+  let on_start s =
+    Logs.app (fun m -> m "Starting %s" @@ Actor.name !s);
+    Lwt.return_unit
+
+  let make_handler id send transitions =
+    let store = Actor.Store.empty in
+    let state = Actor.create store id send |> ref in
+    let handle s msg =
+      List.find_opt (fun t -> Transition.accept t s msg) transitions |> function
+      | None -> Actor.on_unknown s msg
+      | Some t -> Transition.handle t s msg 
+    in
+    let update raw_msg = Actor.check !state raw_msg |> function
+    | s, Some (msg) ->
+      handle s msg >|= fun s -> state := s
+    | s, None ->
+      state := s; Lwt.return_unit
+    in
+    on_start state >|= fun() -> update
+
+  let transtion_update s msg =
+    Logs.app (fun m -> m "Received message %s" @@ Message.to_string msg); Lwt.return s
+
   let start _pclock resolver con =
     let uri = Key_gen.uri () in
     let id = Key_gen.id () in
     let auth = Key_gen.auth () in
     let headers = Cohttp.Header.init () |> with_auth auth in
+    let transitions = [
+      Transition.create ?action:(Some transtion_update) "update" `Default `Default ;
+    ] in
     WS.connect resolver con uri headers
     >>= fun conn ->
       ("START-SEND-MESSAGES" |> WS.make_text_frame |> WS.write conn) <&>
@@ -300,6 +338,6 @@ module Client
         Logs.app (fun m -> m "Sending message %s" @@ Message.to_string msg);
         msg |> Message.to_string |> WS.make_text_frame |> WS.write conn
       in
-      Actor.make_handler id send 
+      make_handler id send transitions
     >>= WS.start conn
 end
