@@ -14,7 +14,7 @@ class Actor extends BaseActor<ActorState> {
     this.app = Express();
   }
 
-  protected override onStart(): void {
+  protected override async onStart(): Promise<void> {
     this.app.get("/start", (req, res) => {
       const msg = new MessageBuilder()
         .withDevice("org.i2ec:air-purifier")
@@ -26,14 +26,38 @@ class Actor extends BaseActor<ActorState> {
       res.send({ status: "OK" });
     });
 
-    this.app.get("/query", (req, res) => {
-      const fields = (req.query.fields as string).split(",");
+    this.app.get("/stop", (req, res) => {
+      const msg = new MessageBuilder()
+        .withDevice("org.i2ec:air-purifier")
+        .withMessageName("power")
+        .withPayload({ power: "off" })
+        .build();
+
+      this.tell(msg);
+      res.send({ status: "OK" });
+    });
+
+    this.app.get("/query_state", (req, res) => {
+      const fields = req.query.fields as string[] | undefined;
+
       const msg = new MessageBuilder()
         .withDevice("org.i2ec:air-purifier")
         .withMessageName("query_state")
         .withPayload({ fields })
         .build();
 
+      this.ask<Message>(msg, 1000).then(
+        v => res.json(v.value),
+        e => res.json({ error: e.message })
+      );
+    });
+
+    this.app.get("/query_db", (req, res) => {
+      const msg = new MessageBuilder()
+        .withDevice("org.i2ec:purifier-db")
+        .withMessageName("query")
+        .withPayload({})
+        .build();
       this.ask<Message>(msg, 1000).then(
         v => res.json(v.value),
         e => res.json({ error: e.message })

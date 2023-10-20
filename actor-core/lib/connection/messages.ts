@@ -4,7 +4,7 @@ export interface DittoProtocol<P> {
   topic: string;
   path: string;
   headers: Record<string, unknown>;
-  value: P | null;
+  value: P;
   status?: number;
 }
 
@@ -12,7 +12,7 @@ export class Message<P = any> implements DittoProtocol<P> {
   topic: string;
   path: string;
   headers: Record<string, unknown>;
-  value: P | null;
+  value: P;
 
   constructor({ topic, path, headers, value }: DittoProtocol<P>) {
     this.topic = topic;
@@ -44,9 +44,9 @@ export interface CommandResponse<P> extends DittoProtocol<P> {
 }
 
 export class MessageBuilder<P> {
-  private payload: P | null = null;
-  private devicePrefix: string | null = null;
-  private message: string | null = null;
+  private payload?: P;
+  private devicePrefix?: string;
+  private message?: string;
   private corrId?: string;
   private contentType: ContentType = "application/json";
 
@@ -84,6 +84,10 @@ export class MessageBuilder<P> {
       throw Error("topic not specified");
     }
 
+    if (this.payload === undefined) {
+      throw Error("payload not specified");
+    }
+
     return new Message({
       topic: this.devicePrefix + "/things/live/messages/" + this.message,
       path: "/inbox/messages/" + this.message,
@@ -97,10 +101,10 @@ export class MessageBuilder<P> {
 }
 
 export class ResponseBuilder<P> {
-  private payload: P | null = null;
-  private devicePrefix: string | null = null;
+  private payload?: P;
+  private devicePrefix?: string;
   private path: string = "/";
-  private topic: string | null = null;
+  private topic?: string;
   private corrId?: string;
   private contentType: ContentType = "application/json";
   private status: number = 200;
@@ -162,6 +166,10 @@ export class ResponseBuilder<P> {
 
     if (!this.topic) {
       throw Error("topic not specified");
+    }
+
+    if (this.payload == undefined) {
+      throw Error("payload not specified");
     }
 
     return {

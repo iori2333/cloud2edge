@@ -1,19 +1,19 @@
 import { LIVE_COMMAND } from "../utils";
 import { Message } from "./messages";
 
-export class Transition<S> {
+export class Transition<S, P = any> {
   topic: string;
   from: S;
   to: S;
-  handler?: (msg: Message) => void;
-  guard?: (msg: Message) => boolean;
+  handler?: (msg: Message<P>) => void;
+  guard?: (msg: Message<P>) => boolean;
 
   constructor(
     message: string,
     from: S,
     to: S,
-    handler?: (msg: Message) => void,
-    guard?: (msg: Message) => boolean
+    handler?: (msg: Message<P>) => void,
+    guard?: (msg: Message<P>) => boolean
   ) {
     this.topic = LIVE_COMMAND + message;
     this.from = from;
@@ -22,11 +22,11 @@ export class Transition<S> {
     this.handler = handler;
   }
 
-  accept(topic: string, msg: Message): boolean {
+  accept(topic: string, msg: Message<P>): boolean {
     return this.guard?.(msg) ?? topic == this.topic;
   }
 
-  handle(msg: Message): void {
+  handle(msg: Message<P>): void {
     this.handler?.(msg);
   }
 }

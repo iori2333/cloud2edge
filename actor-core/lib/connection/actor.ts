@@ -55,8 +55,9 @@ export abstract class Actor<S extends string> {
   }
 
   start(): void {
-    this.onStart();
-    this.conn.on("message", this.listener);
+    this.conn.once("open", () => {
+      this.onStart().then(() => this.conn.on("message", this.listener));
+    });
   }
 
   stop(): void {
@@ -96,12 +97,18 @@ export abstract class Actor<S extends string> {
     return this.state;
   }
 
-  protected onStart(): void {}
+  protected async onStart(): Promise<void> { }
 
-  addTransition(transition: Transition<S>) {
+  addTransition<P>(transition: Transition<S, P>) {
     if (!this.transitions.has(transition.from)) {
       this.transitions.set(transition.from, []);
     }
     this.transitions.get(transition.from)!.push(transition);
+  }
+
+  addTransitions(...transitions: Transition<S>[]) {
+    for (const transition of transitions) {
+      this.addTransition(transition);
+    }
   }
 }
