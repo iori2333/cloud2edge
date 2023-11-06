@@ -7,7 +7,9 @@
   "workspaces": [
     "./packages/air-purifier",
     "./packages/control",
-    "./packages/db"
+    "./packages/db",
+    "./packages/gateway",
+    "./packages/link"
   ],
   "scripts": {
     "build": "tsup",
@@ -17,7 +19,9 @@
     "control:deploy": "docker build -f deployment/control . -t org.i2ec.cpsdt/actors/user",
     "db:start": "node dist/db/index.js",
     "db:deploy": "docker build -f deployment/db . -t org.i2ec.cpsdt/actors/db",
-    "deploy": "yarn build && yarn air-purifier:deploy && yarn control:deploy && yarn db:deploy"
+    "deploy": "yarn build && yarn air-purifier:deploy && yarn control:deploy && yarn db:deploy",
+    "gateway:start": "node dist/gateway/index.js",
+    "link:start": "node dist/link/index.js"
   },
   "dependencies": {
     "@actors/core": "file:../actor-core",
