@@ -1,12 +1,42 @@
 import { WebSocket } from "ws";
 import Express from "express";
 
-import { Message, Actor as BaseActor, MessageBuilder } from "@actors/core";
+import {
+  Message,
+  Actor as BaseActor,
+  MessageBuilder,
+  Output
+} from "@actors/core";
 
 type ActorState = "Default";
 const DEFAULT_STATE: ActorState = "Default";
 
-class Actor extends BaseActor<ActorState> {
+type PowerPayload = {
+  power: string;
+};
+type Power = Output<"org.i2ec:air-purifier", "power", PowerPayload>;
+
+type QueryStatePayload = {
+  fields?: string[];
+  replyTo: string;
+};
+type QueryState = Output<
+  "org.i2ec:air-purifier",
+  "query_state",
+  QueryStatePayload
+>;
+
+type QueryDBPayload = {
+  start?: number;
+  end?: number;
+  limit?: number;
+  offset?: number;
+};
+type QueryDB = Output<"org.i2ec:purifier-db", "query", QueryDBPayload>;
+
+type ActorOutput = Power | QueryState | QueryDB;
+
+class Actor extends BaseActor<ActorState, never, ActorOutput> {
   app: Express.Application;
 
   constructor(thingId: string, conn: WebSocket) {
@@ -16,37 +46,34 @@ class Actor extends BaseActor<ActorState> {
 
   protected override async onStart(): Promise<void> {
     this.app.get("/start", (req, res) => {
-      const msg = new MessageBuilder()
-        .withDevice("org.i2ec:air-purifier")
-        .withMessageName("power")
-        .withPayload({ power: "on" })
-        .build();
-
-      this.tell(msg);
+      this.tell({
+        to: "org.i2ec:air-purifier",
+        topic: "power",
+        payload: { power: "on" }
+      });
       res.send({ status: "OK" });
     });
 
     this.app.get("/stop", (req, res) => {
-      const msg = new MessageBuilder()
-        .withDevice("org.i2ec:air-purifier")
-        .withMessageName("power")
-        .withPayload({ power: "off" })
-        .build();
-
-      this.tell(msg);
+      this.tell({
+        to: "org.i2ec:air-purifier",
+        topic: "power",
+        payload: { power: "off" }
+      });
       res.send({ status: "OK" });
     });
 
     this.app.get("/query_state", (req, res) => {
       const fields = req.query.fields as string[] | undefined;
 
-      const msg = new MessageBuilder()
-        .withDevice("org.i2ec:air-purifier")
-        .withMessageName("query_state")
-        .withPayload({ fields })
-        .build();
-
-      this.ask<Message>(msg, 1000).then(
+      this.ask<Message<any>>(
+        {
+          to: "org.i2ec:air-purifier",
+          topic: "query_state",
+          payload: { fields, replyTo: this.thingId }
+        },
+        1000
+      ).then(
         v => res.json(v.value),
         e => res.json({ error: e.message })
       );
@@ -58,7 +85,14 @@ class Actor extends BaseActor<ActorState> {
         .withMessageName("query")
         .withPayload({})
         .build();
-      this.ask<Message>(msg, 1000).then(
+      this.ask<Message<any>>(
+        {
+          to: "org.i2ec:purifier-db",
+          topic: "query",
+          payload: {}
+        },
+        1000
+      ).then(
         v => res.json(v.value),
         e => res.json({ error: e.message })
       );
@@ -85,7 +119,7 @@ function main() {
     console.log(`Connection closed: ${code}, ${reason.toString()}`);
   });
 
-  const actor = new Actor("<control>", ws);
+  const actor = new Actor("org.i2ec:user-actor", ws);
   actor.start();
 }
 

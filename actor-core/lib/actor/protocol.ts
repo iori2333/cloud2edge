@@ -1,29 +1,34 @@
-import { ContentType, genCorrId } from "../utils";
+import { ContentType, LIVE_COMMAND, genCorrId } from "../utils";
 
-export interface DittoProtocol<P> {
+export interface DittoHeaders {
   topic: string;
   path: string;
   headers: Record<string, unknown>;
+}
+
+export interface DittoProtocol<P> extends DittoHeaders {
   value: P;
   status?: number;
 }
 
-export class Message<P = any> implements DittoProtocol<P> {
+export class Message<P> implements DittoProtocol<P> {
+  to: string;
   topic: string;
   path: string;
   headers: Record<string, unknown>;
   value: P;
 
   constructor({ topic, path, headers, value }: DittoProtocol<P>) {
-    this.topic = topic;
+    [this.to, this.topic] = this.extractTopic(topic);
     this.path = path;
     this.headers = headers;
     this.value = value;
   }
 
-  extractTopic(): [string, string] {
-    const [ns, name, ...topic] = this.topic.split("/");
-    return [ns + ":" + name, "/" + topic.join("/")];
+  private extractTopic(topic: string): [string, string] {
+    const [ns, name] = topic.split("/");
+    const shortTopic = topic.replace(ns + "/" + name + LIVE_COMMAND, "");
+    return [ns + ":" + name, shortTopic];
   }
 
   respond<R>(payload: R, status?: number): CommandResponse<R> {
@@ -37,7 +42,18 @@ export class Message<P = any> implements DittoProtocol<P> {
   get corrId(): string | undefined {
     return this.headers["correlation-id"] as string | undefined;
   }
+
+  json(): DittoProtocol<P> {
+    return {
+      topic: this.to.replace(":", "/") + this.topic,
+      path: this.path,
+      headers: this.headers,
+      value: this.value
+    };
+  }
 }
+
+export type AnyMessage = Message<any>;
 
 export interface CommandResponse<P> extends DittoProtocol<P> {
   status: number;
@@ -45,13 +61,13 @@ export interface CommandResponse<P> extends DittoProtocol<P> {
 
 export class MessageBuilder<P> {
   private payload?: P;
-  private devicePrefix?: string;
+  private deviceId?: string;
   private message?: string;
   private corrId?: string;
   private contentType: ContentType = "application/json";
 
   withDevice(deviceId: string): this {
-    this.devicePrefix = deviceId.replace(":", "/");
+    this.deviceId = deviceId;
     return this;
   }
 
@@ -76,7 +92,11 @@ export class MessageBuilder<P> {
   }
 
   build(): Message<P> {
-    if (!this.devicePrefix) {
+    return new Message(this.json());
+  }
+
+  json() {
+    if (!this.deviceId) {
       throw Error("device not specified");
     }
 
@@ -88,21 +108,24 @@ export class MessageBuilder<P> {
       throw Error("payload not specified");
     }
 
-    return new Message({
-      topic: this.devicePrefix + "/things/live/messages/" + this.message,
+    return {
+      topic:
+        this.deviceId.replace(":", "/") +
+        "/things/live/messages/" +
+        this.message,
       path: "/inbox/messages/" + this.message,
       headers: {
         "correlation-id": this.corrId ?? genCorrId(),
         "content-type": this.contentType
       },
       value: this.payload
-    });
+    };
   }
 }
 
 export class ResponseBuilder<P> {
   private payload?: P;
-  private devicePrefix?: string;
+  private deviceId?: string;
   private path: string = "/";
   private topic?: string;
   private corrId?: string;
@@ -110,22 +133,16 @@ export class ResponseBuilder<P> {
   private status: number = 200;
 
   respondTo<R>(cmd: Message<R>): this {
-    const corrId = cmd.headers["correlation-id"];
-    if (typeof corrId != "string") {
-      return this;
-    }
-    this.corrId = corrId;
-
-    const [ns, name, ...topic] = cmd.topic.split("/");
-    this.devicePrefix = ns + "/" + name;
-    this.topic = "/" + topic.join("/");
+    this.corrId = cmd.corrId;
+    this.deviceId = cmd.to;
+    this.topic = cmd.topic;
     this.path = cmd.path.replace("inbox", "outbox");
 
     return this;
   }
 
   withDevice(deviceId: string): this {
-    this.devicePrefix = deviceId.replace(":", "/");
+    this.deviceId = deviceId;
     return this;
   }
 
@@ -160,7 +177,7 @@ export class ResponseBuilder<P> {
   }
 
   build(): CommandResponse<P> {
-    if (!this.devicePrefix) {
+    if (!this.deviceId) {
       throw Error("device not specified");
     }
 
@@ -173,7 +190,7 @@ export class ResponseBuilder<P> {
     }
 
     return {
-      topic: this.devicePrefix + this.topic,
+      topic: this.deviceId.replace(":", "/") + this.topic,
       path: this.path,
       headers: {
         "correlation-id": this.corrId,

@@ -1,9 +1,5 @@
 import { WebSocket } from "ws";
-
 import { Message, Actor as BaseActor, Transition } from "@actors/core";
-
-type ActorState = "On" | "Off";
-const DEFAULT_STATE: ActorState = "On";
 
 type UpdatePayload = {
   timestamp: number;
@@ -11,29 +7,37 @@ type UpdatePayload = {
   aqi: number;
   humidity: number;
   led: "on" | "off";
-}
+};
+type UpdateTransition = Transition<"update", ActorState, UpdatePayload>;
 
 type QueryPayload = {
   start?: number;
   end?: number;
   limit?: number;
   offset?: number;
-}
+};
+type QueryTransition = Transition<"query", ActorState, QueryPayload>;
 
-type SwitchPayload = null;
+type SwitchPayload = any;
+type SwitchTransition = Transition<"switch", ActorState, SwitchPayload>;
 
-export class Actor extends BaseActor<ActorState> {
+type ActorState = "On" | "Off";
+type ActorTransition = UpdateTransition | QueryTransition | SwitchTransition;
+type ActorOutput = never;
+
+const DEFAULT_STATE: ActorState = "On";
+
+export class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
   messages: string[];
 
   constructor(thingId: string, conn: WebSocket) {
     super(thingId, conn, DEFAULT_STATE);
     this.messages = [];
     this.addTransitions(
-      new Transition("switch", "Off", "On"),
-      new Transition("switch", "On", "Off"),
-      new Transition("update", "On", "On", msg => this.update(msg)),
-      new Transition("query", "On", "On", msg => this.query(msg)),
-      new Transition("query", "Off", "Off", msg => this.query(msg))
+      new Transition("switch", { from: "Off", to: "On" }),
+      new Transition("switch", { from: "On", to: "Off" }),
+      new Transition("update", { from: "On", handler: this.update.bind(this) }),
+      new Transition("query", { handler: this.query.bind(this) })
     );
   }
 
@@ -53,8 +57,7 @@ export class Actor extends BaseActor<ActorState> {
       .filter(msg => msg.timestamp >= start && msg.timestamp <= end)
       .slice(offset, offset + limit);
 
-    const response = msg.respond(filtered);
-    this.tell(response);
+    this.respond(msg, filtered);
   }
 }
 
