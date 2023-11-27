@@ -4,7 +4,7 @@
   "main": "dist/index.js",
   "license": "MIT",
   "scripts": {
-    "build": "tsup"
+    "build": "tsc && tsup"
   },
   "devDependencies": {
     "@types/async": "^3.2.20",

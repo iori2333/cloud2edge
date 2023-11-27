@@ -109,10 +109,7 @@ export class MessageBuilder<P> {
     }
 
     return {
-      topic:
-        this.deviceId.replace(":", "/") +
-        "/things/live/messages/" +
-        this.message,
+      topic: this.deviceId.replace(":", "/") + LIVE_COMMAND + this.message,
       path: "/inbox/messages/" + this.message,
       headers: {
         "correlation-id": this.corrId ?? genCorrId(),

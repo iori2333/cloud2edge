@@ -1,10 +1,10 @@
-import { RawData, WebSocket } from "ws";
 import async from "async";
 
 import { AnyMessage, DittoHeaders, Message, MessageBuilder } from "./protocol";
 import { Future, genCorrId } from "../utils";
 import { AnyTransition } from "./transition";
 import { AnyOutput } from "./output";
+import { Conn } from "../connections";
 
 export class Actor<
   State extends string,
@@ -12,15 +12,15 @@ export class Actor<
   Output extends AnyOutput
 > {
   protected thingId: string;
-  protected conn: WebSocket;
+  protected conn: Conn;
   protected queue: async.QueueObject<AnyMessage>;
   protected state: State;
   protected transitions = new Map<State, Transition[]>();
   protected globalTransitions = new Array<Transition>();
-  protected listener: (data: RawData, isBinary: boolean) => void;
+  protected listener: (msg: string) => void;
   private futureStore = new Map<string, Future<any>>();
 
-  constructor(thingId: string, conn: WebSocket, defaultState: State) {
+  constructor(thingId: string, conn: Conn, defaultState: State) {
     this.thingId = thingId;
     this.conn = conn;
     this.queue = async.queue((msg, done) => {
@@ -32,12 +32,9 @@ export class Actor<
     }, 1);
 
     this.state = defaultState;
-    this.listener = (rawData, isBinary) => {
-      if (isBinary) {
-        return;
-      }
+    this.listener = msg => {
       try {
-        const rawMessage = JSON.parse(rawData.toString("utf-8"));
+        const rawMessage = JSON.parse(msg);
         const message = new Message(rawMessage);
         if (message.corrId && this.futureStore.has(message.corrId)) {
           this.futureStore.get(message.corrId)?.resolve(message);
@@ -57,14 +54,14 @@ export class Actor<
   }
 
   start(): void {
-    this.conn.once("open", () => {
-      this.onStart().then(() => this.conn.on("message", this.listener));
+    this.conn.onOpen(() => {
+      this.onStart().then(() => this.conn.onMessage(this.listener));
     });
   }
 
   stop(): void {
-    this.conn.removeListener("message", this.listener);
     this.queue.kill();
+    this.conn.close();
   }
 
   send(msg: DittoHeaders): void {

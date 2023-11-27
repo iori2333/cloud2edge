@@ -1,4 +1,3 @@
-import { LIVE_COMMAND } from "../utils";
 import { Message } from "./protocol";
 
 export type TransitionOptions<S, P> = {
