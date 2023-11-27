@@ -1,0 +1,36 @@
+{
+  "name": "actors",
+  "private": "true",
+  "version": "1.0.0",
+  "author": "Iori Ichinose",
+  "license": "MIT",
+  "workspaces": [
+    "./packages/camera",
+    "./packages/model",
+    "./packages/user"
+  ],
+  "scripts": {
+    "build": "tsc && tsup",
+    "camera:start": "node dist/camera/index.js",
+    "scheduler:start": "node dist/scheduler/index.js",
+    "model:start": "node dist/model/index.js",
+    "user:start": "node dist/user/index.js"
+  },
+  "dependencies": {
+    "@actors/core": "file:../actor-core",
+    "ws": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.8",
+    "@types/ws": "^8.5.5",
+    "@typescript-eslint/eslint-plugin": "^6.6.0",
+    "@typescript-eslint/parser": "^6.6.0",
+    "eslint": "^8.48.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.3",
+    "ts-node": "^10.9.1",
+    "tsup": "^7.2.0",
+    "typescript": "^5.2.2"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@demo/camera",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "author": "Iori Ichinose",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && ts-node index.ts"
+  },
+  "dependencies": {
+    "node-webcam": "^0.8.2"
+  },
+  "devDependencies": {
+    "@types/node-webcam": "^0.8.3"
+  }
+}
