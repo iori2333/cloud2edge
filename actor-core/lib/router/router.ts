@@ -1,5 +1,5 @@
-import { WebSocket } from "ws";
 import { Actor, AnyOutput, AnyTransition } from "../actor";
+import { Conn } from "../connections";
 
 export interface RoutingLogic {
   select(to: string, candidates: string[]): string;
@@ -24,16 +24,17 @@ export class RandomRouting implements RoutingLogic {
 export class Router<
   State extends string,
   Transition extends AnyTransition<State>,
-  Output extends AnyOutput
+  Output extends AnyOutput,
+  Selector extends RoutingLogic = RoutingLogic
 > extends Actor<State, Transition, Output> {
   children: Map<string, string[]>;
-  logic: RoutingLogic;
+  logic: Selector;
 
   constructor(
     thingId: string,
-    conn: WebSocket,
+    conn: Conn,
     default_state: State,
-    logic: RoutingLogic
+    logic: Selector
   ) {
     super(thingId, conn, default_state);
     this.children = new Map();

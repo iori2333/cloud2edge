@@ -1,4 +1,3 @@
-import WebSocket from "ws";
 import {
   AnyOutput,
   AnyTransition,
@@ -7,6 +6,7 @@ import {
   Output
 } from "../actor";
 import { Router, RoutingLogic } from "./router";
+import { Conn } from "../connections";
 
 type RegisterPayload = {
   actorRef: string;
@@ -27,13 +27,19 @@ type RouterTransitions<S> = Register<S> | Unregister<S>;
 export class GroupRouter<
   State extends string,
   Transition extends AnyTransition<State>,
-  Output extends AnyOutput
-> extends Router<State, Transition | RouterTransitions<State>, Output> {
+  Output extends AnyOutput,
+  Selector extends RoutingLogic = RoutingLogic
+> extends Router<
+  State,
+  Transition | RouterTransitions<State>,
+  Output,
+  Selector
+> {
   constructor(
     thingId: string,
-    conn: WebSocket,
+    conn: Conn,
     default_state: State,
-    logic: RoutingLogic
+    logic: Selector
   ) {
     super(thingId, conn, default_state, logic);
     this.addTransitions(
