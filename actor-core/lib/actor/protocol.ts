@@ -11,190 +11,109 @@ export interface DittoProtocol<P> extends DittoHeaders {
   status?: number;
 }
 
-export class Message<P> implements DittoProtocol<P> {
+export interface Protocol {
   to: string;
   topic: string;
-  path: string;
-  headers: Record<string, unknown>;
-  value: P;
-
-  constructor({ topic, path, headers, value }: DittoProtocol<P>) {
-    [this.to, this.topic] = this.extractTopic(topic);
-    this.path = path;
-    this.headers = headers;
-    this.value = value;
-  }
-
-  private extractTopic(topic: string): [string, string] {
-    const [ns, name] = topic.split("/");
-    const shortTopic = topic.replace(ns + "/" + name + LIVE_COMMAND, "");
-    return [ns + ":" + name, shortTopic];
-  }
-
-  respond<R>(payload: R, status?: number): CommandResponse<R> {
-    return new ResponseBuilder<R>()
-      .respondTo(this)
-      .withPayload(payload)
-      .withStatus(status ?? 200)
-      .build();
-  }
-
-  get corrId(): string | undefined {
-    return this.headers["correlation-id"] as string | undefined;
-  }
-
-  json(): DittoProtocol<P> {
-    return {
-      topic: this.to.replace(":", "/") + this.topic,
-      path: this.path,
-      headers: this.headers,
-      value: this.value
-    };
-  }
 }
 
-export type AnyMessage = Message<any>;
+export type Message<P> = Protocol & { payload: P };
 
-export interface CommandResponse<P> extends DittoProtocol<P> {
-  status: number;
-}
+export type TellMessage<P> = Message<P>;
+export type AskMessage<P> = TellMessage<P> & { replyTo: string };
+export type ReplyMessage<P> = AskMessage<P> & { status: number };
 
-export class MessageBuilder<P> {
-  private payload?: P;
-  private deviceId?: string;
-  private message?: string;
-  private corrId?: string;
-  private contentType: ContentType = "application/json";
+export type AnyMessage<P> = TellMessage<P> | AskMessage<P> | ReplyMessage<P>;
 
-  withDevice(deviceId: string): this {
-    this.deviceId = deviceId;
-    return this;
-  }
-
-  withPayload(payload: P): this {
-    this.payload = payload;
-    return this;
-  }
-
-  withMessageName(message: string): this {
-    this.message = message;
-    return this;
-  }
-
-  withCorrId(corrId: string): this {
-    this.corrId = corrId;
-    return this;
-  }
-
-  withContentType(type: ContentType): this {
-    this.contentType = type;
-    return this;
-  }
-
-  build(): Message<P> {
-    return new Message(this.json());
-  }
-
-  json() {
-    if (!this.deviceId) {
-      throw Error("device not specified");
+export class Messages {
+  static validate(rawMsg: string): AnyMessage<any> {
+    const msg = JSON.parse(rawMsg);
+    if (!msg.to || typeof msg.to !== "string") {
+      throw Error("to not specified");
     }
 
-    if (!this.message) {
+    if (!msg.topic || typeof msg.topic !== "string") {
       throw Error("topic not specified");
     }
 
-    if (this.payload === undefined) {
+    if (msg.payload === undefined) {
       throw Error("payload not specified");
     }
 
+    const protocol: Protocol & { replyTo?: string; status?: string } = {
+      to: msg.to,
+      topic: msg.topic
+    };
+
+    if (msg.replyTo) {
+      if (typeof msg.replyTo !== "string") {
+        throw Error("replyTo must be a string");
+      }
+      protocol.replyTo = msg.replyTo;
+    }
+
+    if (msg.status) {
+      if (typeof msg.status !== "number") {
+        throw Error("status must be a number");
+      }
+      protocol.status = msg.status;
+    }
+
     return {
-      topic: this.deviceId.replace(":", "/") + LIVE_COMMAND + this.message,
-      path: "/inbox/messages/" + this.message,
-      headers: {
-        "correlation-id": this.corrId ?? genCorrId(),
-        "content-type": this.contentType
-      },
-      value: this.payload
+      ...protocol,
+      payload: msg.payload
     };
   }
-}
 
-export class ResponseBuilder<P> {
-  private payload?: P;
-  private deviceId?: string;
-  private path: string = "/";
-  private topic?: string;
-  private corrId?: string;
-  private contentType: ContentType = "application/json";
-  private status: number = 200;
-
-  respondTo<R>(cmd: Message<R>): this {
-    this.corrId = cmd.corrId;
-    this.deviceId = cmd.to;
-    this.topic = cmd.topic;
-    this.path = cmd.path.replace("inbox", "outbox");
-
-    return this;
+  static isTell<P>(msg: unknown): msg is TellMessage<P> {
+    return (
+      typeof msg === "object" &&
+      msg !== null &&
+      "to" in msg &&
+      "topic" in msg &&
+      "payload" in msg &&
+      !("replyTo" in msg)
+    );
   }
 
-  withDevice(deviceId: string): this {
-    this.deviceId = deviceId;
-    return this;
+  static isAsk<P>(msg: unknown): msg is AskMessage<P> {
+    return (
+      typeof msg === "object" &&
+      msg !== null &&
+      "to" in msg &&
+      "topic" in msg &&
+      "payload" in msg &&
+      "replyTo" in msg
+    );
   }
 
-  withPayload(payload: P): this {
-    this.payload = payload;
-    return this;
+  static isReply<P>(msg: unknown): msg is ReplyMessage<P> {
+    return (
+      typeof msg === "object" &&
+      msg !== null &&
+      "to" in msg &&
+      "topic" in msg &&
+      "payload" in msg &&
+      "replyTo" in msg &&
+      "status" in msg
+    );
   }
 
-  withPath(path: string): this {
-    this.path = path;
-    return this;
-  }
-
-  withTopic(topic: string): this {
-    this.topic = topic;
-    return this;
-  }
-
-  withCorrId(corrId: string): this {
-    this.corrId = corrId;
-    return this;
-  }
-
-  withStatus(status: number): this {
-    this.status = status;
-    return this;
-  }
-
-  withContentType(type: ContentType): this {
-    this.contentType = type;
-    return this;
-  }
-
-  build(): CommandResponse<P> {
-    if (!this.deviceId) {
-      throw Error("device not specified");
-    }
-
-    if (!this.topic) {
-      throw Error("topic not specified");
-    }
-
-    if (this.payload == undefined) {
-      throw Error("payload not specified");
-    }
-
+  static ask<P>(msg: TellMessage<P>, corrId?: string): AskMessage<P> {
     return {
-      topic: this.deviceId.replace(":", "/") + this.topic,
-      path: this.path,
-      headers: {
-        "correlation-id": this.corrId,
-        "content-type": this.contentType
-      },
-      value: this.payload,
-      status: this.status
+      ...msg,
+      replyTo: corrId ?? genCorrId()
+    };
+  }
+
+  static reply<P, R>(
+    msg: AskMessage<P>,
+    payload: R,
+    status?: number
+  ): ReplyMessage<R> {
+    return {
+      ...msg,
+      payload,
+      status: status ?? 200
     };
   }
 }

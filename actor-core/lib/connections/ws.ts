@@ -13,8 +13,6 @@ export class WebsocketConn implements Conn {
 
     this.onOpen(() => {
       console.log(`Successfully connected to ${this.url}`);
-      this.send("START-SEND-MESSAGES");
-      this.send("START-SEND-LIVE-COMMANDS");
     });
 
     this.onClose(reason => {

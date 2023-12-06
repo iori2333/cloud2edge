@@ -49,12 +49,12 @@ export class GroupRouter<
   }
 
   onRegister(msg: Message<RegisterPayload>): void {
-    const { actorRef, proxy } = msg.value;
+    const { actorRef, proxy } = msg.payload;
     this.register(proxy, actorRef);
   }
 
   onUnregister(msg: Message<UnregisterPayload>): void {
-    const { actorRef, proxy } = msg.value;
+    const { actorRef, proxy } = msg.payload;
     this.unregister(proxy, actorRef);
   }
 }
