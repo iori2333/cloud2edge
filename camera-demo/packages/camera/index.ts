@@ -17,6 +17,7 @@ type SwitchTransition = Transition<"Switch", ActorState, SwitchPayload>;
 type InferencePayload = {
   name: string;
   img: string;
+  format: string;
 };
 type Inference = Output<
   "org.i2ec:camera-scheduler",
@@ -62,7 +63,7 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
   }
 
   protected async onStart(): Promise<void> {
-    this.capture = setInterval(() => this.captureImage(), 1000);
+    this.capture = setInterval(() => this.captureImage(), 500);
   }
 
   private onSwitch(msg: Message<SwitchPayload>) {
@@ -71,7 +72,7 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
       this.capture = null;
       return;
     }
-    const { interval } = msg.value;
+    const { interval } = msg.payload;
     this.capture = setInterval(() => this.captureImage(), interval ?? 5000);
   }
 
@@ -83,18 +84,19 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
       }
 
       const name = `image-${Date.now()}`;
+      const pattern = /^data:image\/(\w+);base64,/;
       console.log(`Captured image ${name}`);
       this.tell({
         to: "org.i2ec:camera-scheduler",
         topic: "Inference",
-        payload: { name, img: "" }
+        payload: { name, img: data.replace(pattern, ""), format: "png" }
       });
     });
   }
 }
 
 function main() {
-  const ws = new WebsocketConn("ws://ditto:ditto@localhost:32728/ws/2");
+  const ws = new WebsocketConn("ws://localhost:8080/ws/org.i2ec/camera");
   const actor = new Actor("org.i2ec:camera", ws);
   actor.start();
 }

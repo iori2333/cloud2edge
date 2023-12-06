@@ -16,6 +16,7 @@ import {
 type InferencePayload = {
   name: string;
   img: string;
+  format: string;
 };
 type InferenceTransition = Transition<
   "Inference",
@@ -33,7 +34,12 @@ type StatusTransition = Transition<"Status", ActorState, StatusPayload>;
 
 type InferenceResultPayload = {
   name: string;
-  data?: string;
+  img: string;
+  pred?: {
+    bbox: number[];
+    class: string;
+    score: number;
+  }[];
   err?: string;
 };
 type InferenceResult = Output<
@@ -98,24 +104,26 @@ class Actor extends Router<
   }
 
   private onStatus(msg: Message<StatusPayload>) {
-    const { name, pending, avg_time } = msg.value;
+    const { name, pending, avg_time } = msg.payload;
     const eta = pending * avg_time;
     this.logic.update(name, eta);
   }
 
   private onInference(msg: Message<InferencePayload>) {
-    const { name, img } = msg.value;
+    const { name, img, format } = msg.payload;
     console.log(name);
     this.tell({
       to: "org.i2ec:camera-model",
       topic: "Inference",
-      payload: { name, img }
+      payload: { name, img, format }
     });
   }
 }
 
 function main() {
-  const ws = new WebsocketConn("ws://ditto:ditto@localhost:32728/ws/2");
+  const ws = new WebsocketConn(
+    "ws://localhost:8080/ws/org.i2ec/camera-scheduler"
+  );
 
   const actor = new Actor("org.i2ec:camera-scheduler", ws);
   actor.start();

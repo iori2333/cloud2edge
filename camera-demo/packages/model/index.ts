@@ -1,7 +1,4 @@
-import { WebSocket } from "ws";
-
 import {
-  AnyMessage,
   Actor as BaseActor,
   Conn,
   Message,
@@ -9,6 +6,7 @@ import {
   Transition,
   WebsocketConn
 } from "@actors/core";
+import { detect } from "./detect";
 
 type ModelPreparePayload = {
   name: string;
@@ -23,6 +21,7 @@ type ModelPrepareTransition = Transition<
 type InferencePayload = {
   name: string;
   img: string;
+  format: string;
 };
 type InferenceTransition = Transition<
   "Inference",
@@ -32,7 +31,12 @@ type InferenceTransition = Transition<
 
 type InferenceResultPayload = {
   name: string;
-  data?: string;
+  img: string;
+  pred?: {
+    bbox: number[];
+    class: string;
+    score: number;
+  }[];
   err?: string;
 };
 type InferenceResult = Output<
@@ -75,24 +79,19 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
   }
 
   private onModelPrepare(msg: Message<ModelPreparePayload>) {
-    const { name, model } = msg.value;
+    const { name, model } = msg.payload;
     console.log(`Preparing model ${name}, url: ${model}`);
     this.model_url = model;
   }
 
   private onInference(msg: Message<InferencePayload>) {
-    const { name, img } = msg.value;
-    const res = new Promise<string>(resolve => {
-      setTimeout(() => {
-        resolve(img);
-      }, 3000);
-    });
+    const { name, img, format } = msg.payload;
+    console.log(`[${name}] Inference image`);
     const tic = Date.now();
     this.pending++;
 
     this.sendStatus();
-
-    res
+    detect(img, format)
       .then(data => {
         const toc = Date.now();
         this.time += toc - tic;
@@ -104,13 +103,14 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
           topic: "InferenceResult",
           payload: {
             name,
-            data
+            img,
+            pred: data
           }
         });
 
         this.sendStatus();
       })
-      .catch(err => console.log(`Failed to inference: ${err}`));
+      .catch(err => console.log(`[${name}] Failed to inference: ${err}`));
   }
 
   private sendStatus() {
@@ -129,7 +129,9 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
 }
 
 function main() {
-  const ws = new WebsocketConn("ws://ditto:ditto@localhost:32728/ws/2");
+  const ws = new WebsocketConn(
+    "ws://localhost:8080/ws/org.i2ec/camera-model-1"
+  );
 
   const actor = new Actor("org.i2ec:camera-model-1", ws);
   actor.start();
