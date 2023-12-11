@@ -1,15 +1,4 @@
-import { ContentType, LIVE_COMMAND, genCorrId } from "../utils";
-
-export interface DittoHeaders {
-  topic: string;
-  path: string;
-  headers: Record<string, unknown>;
-}
-
-export interface DittoProtocol<P> extends DittoHeaders {
-  value: P;
-  status?: number;
-}
+import { genCorrId } from "../utils";
 
 export interface Protocol {
   to: string;

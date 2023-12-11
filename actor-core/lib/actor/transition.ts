@@ -1,11 +1,11 @@
 import { Message } from "./protocol";
 
-export type TransitionOptions<S, P> = {
+interface TransitionOptions<S, P> {
   from?: S;
   to?: S;
   handler?: (msg: Message<P>) => void;
   guard?: (msg: Message<P>) => boolean;
-};
+}
 
 export class Transition<I extends string, S, P> {
   topic: string;

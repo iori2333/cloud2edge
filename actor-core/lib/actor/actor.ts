@@ -1,14 +1,9 @@
-import {
-  AnyMessage,
-  AskMessage,
-  Messages,
-  ReplyMessage,
-  TellMessage
-} from "./protocol";
+import { AskMessage, Messages, ReplyMessage, TellMessage } from "./protocol";
 import { Future } from "../utils";
 import { AnyTransition } from "./transition";
 import { AnyOutput } from "./output";
 import { Conn } from "../connections";
+import { Capacity } from "./capacity";
 
 export class Actor<
   State extends string,
@@ -16,11 +11,12 @@ export class Actor<
   Output extends AnyOutput
 > {
   protected thingId: string;
-  protected conn: Conn;
   protected state: State;
   protected transitions = new Map<State, Transition[]>();
   protected globalTransitions = new Array<Transition>();
-  protected listener: (msg: string) => void;
+
+  private conn: Conn;
+  private listener: (msg: string) => void;
   private futureStore = new Map<string, Future<any>>();
 
   constructor(thingId: string, conn: Conn, defaultState: State) {
@@ -143,5 +139,9 @@ export class Actor<
     for (const transition of transitions) {
       this.addTransition(transition);
     }
+  }
+
+  call<P, R>(capacity: Capacity<P, R>, payload: P): Promise<R> {
+    return capacity.handle(payload);
   }
 }
