@@ -6,7 +6,7 @@ import {
   Transition,
   WebsocketConn
 } from "@actors/core";
-import { detect } from "./detect";
+import { capacity as modelCapacity } from "./model";
 
 type ModelPreparePayload = {
   name: string;
@@ -57,6 +57,17 @@ type ActorTransition = ModelPrepareTransition | InferenceTransition;
 type ActorOutput = InferenceResult | Status;
 
 const DEFAULT_STATE: ActorState = "Ready";
+const model = modelCapacity.withMappers({
+  payload: (input: InferencePayload) => ({
+    img: input.img,
+    format: input.format
+  }),
+  result: (result, input: InferencePayload) => ({
+    name: input.name,
+    img: input.img,
+    ...result
+  })
+});
 
 class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
   model_url: string | null = null;
@@ -91,7 +102,7 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
     this.pending++;
 
     this.sendStatus();
-    detect(img, format)
+    this.call(model, { name, img, format })
       .then(data => {
         const toc = Date.now();
         this.time += toc - tic;
@@ -101,11 +112,7 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
         this.tell({
           to: "org.i2ec:camera-user",
           topic: "InferenceResult",
-          payload: {
-            name,
-            img,
-            pred: data
-          }
+          payload: data
         });
 
         this.sendStatus();
