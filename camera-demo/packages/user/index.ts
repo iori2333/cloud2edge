@@ -3,7 +3,8 @@ import {
   Actor as BaseActor,
   Transition,
   WebsocketConn,
-  Conn
+  Conn,
+  Transitions
 } from "@actors/core";
 import gmBase from "gm";
 
@@ -35,11 +36,10 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
   constructor(thingId: string, conn: Conn) {
     super(thingId, conn, DEFAULT_STATE);
 
-    this.addTransitions(
-      new Transition("InferenceResult", {
-        handler: this.onInferenceResult.bind(this)
-      })
-    );
+    this.addTransition({
+      topic: "InferenceResult",
+      handler: msg => this.onInferenceResult(msg)
+    });
   }
 
   private onInferenceResult(msg: Message<InferenceResultPayload>) {
@@ -49,7 +49,6 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
       return;
     }
 
-    // const pic = pred.split(",")[1];
     const buf = Buffer.from(img, "base64");
     const pic = gm(buf);
     for (const obj of pred) {

@@ -1,12 +1,14 @@
 import {
   Actor as BaseActor,
+  Capacities,
   Conn,
   Message,
   Output,
   Transition,
+  Transitions,
   WebsocketConn
 } from "@actors/core";
-import { capacity as modelCapacity } from "./model";
+import { inference as inferenceCapacity } from "./model";
 
 type ModelPreparePayload = {
   name: string;
@@ -57,15 +59,29 @@ type ActorTransition = ModelPrepareTransition | InferenceTransition;
 type ActorOutput = InferenceResult | Status;
 
 const DEFAULT_STATE: ActorState = "Ready";
-const model = modelCapacity.withMappers({
+
+const inference = Capacities.withMapper(inferenceCapacity, {
   payload: (input: InferencePayload) => ({
     img: input.img,
     format: input.format
   }),
-  result: (result, input: InferencePayload) => ({
-    name: input.name,
-    img: input.img,
-    ...result
+  result: (result, input): InferenceResult => ({
+    to: "org.i2ec:camera-user",
+    topic: "InferenceResult",
+    payload: {
+      name: input.name,
+      img: input.img,
+      pred: result
+    }
+  }),
+  error: (reason, input): InferenceResult => ({
+    to: "org.i2ec:camera-user",
+    topic: "InferenceResult",
+    payload: {
+      name: input.name,
+      img: input.img,
+      err: reason.toString()
+    }
   })
 });
 
@@ -77,16 +93,14 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
 
   constructor(thingId: string, conn: Conn) {
     super(thingId, conn, DEFAULT_STATE);
-    this.addTransitions(
-      new Transition("ModelPrepare", {
-        to: "Ready",
-        handler: this.onModelPrepare.bind(this)
-      }),
-      new Transition("Inference", {
-        from: "Ready",
-        handler: this.onInference.bind(this)
-      })
-    );
+    this.addTransitions({
+      topic: "ModelPrepare",
+      handler: msg => this.onModelPrepare(msg)
+    });
+    this.addTransition({
+      topic: "Inference",
+      handler: msg => this.onInference(msg)
+    });
   }
 
   private onModelPrepare(msg: Message<ModelPreparePayload>) {
@@ -95,35 +109,27 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
     this.model_url = model;
   }
 
-  private onInference(msg: Message<InferencePayload>) {
+  private async onInference(msg: Message<InferencePayload>) {
     const { name, img, format } = msg.payload;
     console.log(`[${name}] Inference image`);
     const tic = Date.now();
     this.pending++;
 
-    this.sendStatus();
-    this.call(model, { name, img, format })
-      .then(data => {
-        const toc = Date.now();
-        this.time += toc - tic;
-        this.done++;
-        this.pending--;
+    await this.sendStatus();
+    const response = await this.call(inference, { name, img, format });
+    const toc = Date.now();
+    this.time += toc - tic;
+    this.done++;
+    this.pending--;
 
-        this.tell({
-          to: "org.i2ec:camera-user",
-          topic: "InferenceResult",
-          payload: data
-        });
-
-        this.sendStatus();
-      })
-      .catch(err => console.log(`[${name}] Failed to inference: ${err}`));
+    await this.tell(response);
+    await this.sendStatus();
   }
 
-  private sendStatus() {
+  private async sendStatus() {
     if (this.done === 0) return;
     const avg_time = this.time / this.done;
-    this.tell({
+    await this.tell({
       to: "org.i2ec:camera-scheduler",
       topic: "Status",
       payload: {

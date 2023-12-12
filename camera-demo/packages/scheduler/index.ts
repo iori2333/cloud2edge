@@ -10,6 +10,7 @@ import {
   Router,
   RoutingLogic,
   Transition,
+  Transitions,
   WebsocketConn
 } from "@actors/core";
 
@@ -88,14 +89,16 @@ class Actor extends Router<
 
   constructor(thingId: string, conn: Conn) {
     super(thingId, conn, DEFAULT_STATE, new ModelScheduler());
-    this.addTransitions(
-      new Transition("Inference", {
-        handler: this.onInference.bind(this)
-      }),
-      new Transition("Status", {
-        handler: this.onStatus.bind(this)
-      })
-    );
+
+    this.addTransition({
+      topic: "Inference",
+      handler: msg => this.onInference(msg)
+    });
+
+    this.addTransition({
+      topic: "Status",
+      handler: msg => this.onStatus(msg)
+    });
   }
 
   protected async onStart(): Promise<void> {
@@ -109,10 +112,10 @@ class Actor extends Router<
     this.logic.update(name, eta);
   }
 
-  private onInference(msg: Message<InferencePayload>) {
+  private async onInference(msg: Message<InferencePayload>) {
     const { name, img, format } = msg.payload;
     console.log(name);
-    this.tell({
+    await this.tell({
       to: "org.i2ec:camera-model",
       topic: "Inference",
       payload: { name, img, format }

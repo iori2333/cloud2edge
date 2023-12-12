@@ -6,6 +6,7 @@ import {
   Message,
   Output,
   Transition,
+  Transitions,
   WebsocketConn
 } from "@actors/core";
 
@@ -34,32 +35,36 @@ const DEFAULT_STATE: ActorState = "On";
 class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
   capture: NodeJS.Timeout | null = null;
   cam: webcam.Webcam;
+  i: number = 0;
 
   constructor(thingId: string, conn: Conn) {
     super(thingId, conn, DEFAULT_STATE);
 
     webcam.list(cams => {
-      console.log(`Receving ${cams.length} cameras, using ${cams[0]}`);
+      console.log("Available cameras:", cams);
+      console.log(`Receving ${cams.length} cameras, using ${cams[1]}`);
     });
 
     this.cam = webcam.create({
       callbackReturn: "base64",
+      device: "/dev/video0",
       verbose: false,
       output: "png"
     });
 
-    this.addTransitions(
-      new Transition("Switch", {
-        from: "Off",
-        to: "On",
-        handler: this.onSwitch.bind(this)
-      }),
-      new Transition("Switch", {
-        from: "On",
-        to: "Off",
-        handler: this.onSwitch.bind(this)
-      })
-    );
+    this.addTransition({
+      topic: "Switch",
+      from: "Off",
+      to: "On",
+      handler: msg => this.onSwitch(msg)
+    });
+
+    this.addTransition({
+      topic: "Switch",
+      from: "On",
+      to: "Off",
+      handler: msg => this.onSwitch(msg)
+    });
   }
 
   protected async onStart(): Promise<void> {
@@ -77,16 +82,16 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
   }
 
   private captureImage() {
-    this.cam.capture("/tmp/output", (err, data) => {
+    this.cam.capture("/tmp/output", async (err, data) => {
       if (err || typeof data != "string") {
         console.log(`Failed to capture image: ${err}`);
         return;
       }
 
-      const name = `image-${Date.now()}`;
+      const name = `image-${this.i++}`;
       const pattern = /^data:image\/(\w+);base64,/;
       console.log(`Captured image ${name}`);
-      this.tell({
+      await this.tell({
         to: "org.i2ec:camera-scheduler",
         topic: "Inference",
         payload: { name, img: data.replace(pattern, ""), format: "png" }
