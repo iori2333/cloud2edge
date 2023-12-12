@@ -45,11 +45,11 @@ export class WebsocketConn implements Conn {
     });
   }
 
-  send(msg: string): void {
+  async send(msg: string): Promise<void> {
     this.ws.send(msg);
   }
 
-  close(): void {
+  async close(): Promise<void> {
     this.ws.close();
   }
 

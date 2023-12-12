@@ -1,5 +1,5 @@
 export * from "./protocol";
-export * from "./actor";
-export * from "./transition";
-export * from "./output";
-export * from "./capacity";
+export { Actor } from "./actor";
+export { Transition, Transitions, AnyTransition } from "./transition";
+export { Output, AnyOutput } from "./output";
+export { Capacities, CapacityOptions, AnyCapacity } from "./capacity";

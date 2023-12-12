@@ -59,24 +59,24 @@ export class Router<
     }
   }
 
-  override tell(msg: Output): void {
+  override async tell(msg: Output): Promise<void> {
     const candidates = this.children.get(msg.to) || [];
     if (candidates.length == 0) {
-      return super.tell(msg);
+      return await super.tell(msg);
     }
 
     const to = this.logic.select(msg.to, candidates);
-    super.tell({ ...msg, to });
+    await super.tell({ ...msg, to });
   }
 
-  broadcast(msg: Output): void {
+  async broadcast(msg: Output): Promise<void> {
     const proxies = this.children.get(msg.to) || [];
     if (proxies.length == 0) {
-      return super.tell(msg);
+      return await super.tell(msg);
     }
 
     for (const proxy of proxies) {
-      super.tell({ ...msg, to: proxy });
+      await super.tell({ ...msg, to: proxy });
     }
   }
 }

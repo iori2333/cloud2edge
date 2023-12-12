@@ -3,6 +3,7 @@ export interface Conn {
   onMessage(cb: (msg: string) => void): void;
   onError(cb: (err: Error) => void): void;
   onClose(cb: (reason: string) => void): void;
-  send(msg: string): void;
-  close(): void;
+
+  send(msg: string): Promise<void>;
+  close(): Promise<void>;
 }

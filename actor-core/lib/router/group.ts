@@ -42,18 +42,24 @@ export class GroupRouter<
     logic: Selector
   ) {
     super(thingId, conn, default_state, logic);
-    this.addTransitions(
-      new Transition("register", { handler: this.onRegister.bind(this) }),
-      new Transition("unregister", { handler: this.onUnregister.bind(this) })
-    );
+
+    this.addTransition({
+      topic: "register",
+      handler: this.onRegister.bind(this)
+    });
+
+    this.addTransition({
+      topic: "unregister",
+      handler: this.onUnregister.bind(this)
+    });
   }
 
-  onRegister(msg: Message<RegisterPayload>): void {
+  async onRegister(msg: Message<RegisterPayload>) {
     const { actorRef, proxy } = msg.payload;
     this.register(proxy, actorRef);
   }
 
-  onUnregister(msg: Message<UnregisterPayload>): void {
+  async onUnregister(msg: Message<UnregisterPayload>) {
     const { actorRef, proxy } = msg.payload;
     this.unregister(proxy, actorRef);
   }
