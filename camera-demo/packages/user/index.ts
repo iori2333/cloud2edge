@@ -2,9 +2,8 @@ import {
   Message,
   Actor as BaseActor,
   Transition,
-  WebsocketConn,
-  Conn,
-  Transitions
+  Conns,
+  Conn
 } from "@actors/core";
 import gmBase from "gm";
 
@@ -77,9 +76,8 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
 }
 
 function main() {
-  const ws = new WebsocketConn("ws://localhost:8080/ws/org.i2ec/camera-user");
-
-  const actor = new Actor("org.i2ec:camera-user", ws);
+  const conn = Conns.ws("ws://localhost:8080/ws/org.i2ec/camera-user");
+  const actor = new Actor("org.i2ec:camera-user", conn);
   actor.start();
 }
 

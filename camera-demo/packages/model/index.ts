@@ -2,11 +2,10 @@ import {
   Actor as BaseActor,
   Capacities,
   Conn,
+  Conns,
   Message,
   Output,
-  Transition,
-  Transitions,
-  WebsocketConn
+  Transition
 } from "@actors/core";
 import { inference as inferenceCapacity } from "./model";
 
@@ -142,11 +141,8 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
 }
 
 function main() {
-  const ws = new WebsocketConn(
-    "ws://localhost:8080/ws/org.i2ec/camera-model-1"
-  );
-
-  const actor = new Actor("org.i2ec:camera-model-1", ws);
+  const conn = Conns.ws("ws://localhost:8080/ws/org.i2ec/camera-model-1");
+  const actor = new Actor("org.i2ec:camera-model-1", conn);
   actor.start();
 }
 

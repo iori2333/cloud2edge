@@ -1,14 +1,13 @@
-import * as webcam from "node-webcam";
-
 import {
   Actor as BaseActor,
+  Capacities,
   Conn,
   Message,
   Output,
   Transition,
-  Transitions,
-  WebsocketConn
+  Conns
 } from "@actors/core";
+import { capture as captureCapacity } from "./webcam";
 
 type SwitchPayload = {
   interval?: number;
@@ -31,26 +30,24 @@ type ActorTransition = SwitchTransition;
 type ActorOutput = Inference;
 
 const DEFAULT_STATE: ActorState = "On";
+const capture = Capacities.withResultMapper(
+  captureCapacity,
+  (res): Inference => ({
+    to: "org.i2ec:camera-scheduler",
+    topic: "Inference",
+    payload: {
+      name: `img-${Date.now()}`,
+      img: res.img,
+      format: res.format
+    }
+  })
+);
 
 class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
   capture: NodeJS.Timeout | null = null;
-  cam: webcam.Webcam;
-  i: number = 0;
 
   constructor(thingId: string, conn: Conn) {
     super(thingId, conn, DEFAULT_STATE);
-
-    webcam.list(cams => {
-      console.log("Available cameras:", cams);
-      console.log(`Receving ${cams.length} cameras, using ${cams[1]}`);
-    });
-
-    this.cam = webcam.create({
-      callbackReturn: "base64",
-      device: "/dev/video0",
-      verbose: false,
-      output: "png"
-    });
 
     this.addTransition({
       topic: "Switch",
@@ -82,27 +79,18 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
   }
 
   private captureImage() {
-    this.cam.capture("/tmp/output", async (err, data) => {
-      if (err || typeof data != "string") {
-        console.log(`Failed to capture image: ${err}`);
-        return;
-      }
-
-      const name = `image-${this.i++}`;
-      const pattern = /^data:image\/(\w+);base64,/;
-      console.log(`Captured image ${name}`);
-      await this.tell({
-        to: "org.i2ec:camera-scheduler",
-        topic: "Inference",
-        payload: { name, img: data.replace(pattern, ""), format: "png" }
-      });
-    });
+    this.call(capture, null)
+      .then(res => {
+        console.log(`Captured image ${res.payload.name}`);
+        this.tell(res);
+      })
+      .catch(err => console.log(`Failed to capture image: ${err}`));
   }
 }
 
 function main() {
-  const ws = new WebsocketConn("ws://localhost:8080/ws/org.i2ec/camera");
-  const actor = new Actor("org.i2ec:camera", ws);
+  const conn = Conns.ws("ws://localhost:8080/ws/org.i2ec/camera");
+  const actor = new Actor("org.i2ec:camera", conn);
   actor.start();
 }
 

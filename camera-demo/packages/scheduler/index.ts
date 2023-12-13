@@ -1,17 +1,11 @@
-import { WebSocket } from "ws";
-
 import {
-  AnyMessage,
-  Actor as BaseActor,
   Conn,
   Message,
   Output,
-  RandomRouting,
   Router,
   RoutingLogic,
   Transition,
-  Transitions,
-  WebsocketConn
+  Conns
 } from "@actors/core";
 
 type InferencePayload = {
@@ -124,11 +118,8 @@ class Actor extends Router<
 }
 
 function main() {
-  const ws = new WebsocketConn(
-    "ws://localhost:8080/ws/org.i2ec/camera-scheduler"
-  );
-
-  const actor = new Actor("org.i2ec:camera-scheduler", ws);
+  const conn = Conns.ws("ws://localhost:8080/ws/org.i2ec/camera-scheduler");
+  const actor = new Actor("org.i2ec:camera-scheduler", conn);
   actor.start();
 }
 
