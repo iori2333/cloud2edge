@@ -16,39 +16,39 @@ export class Actor<
   protected globalTransitions: AnyWrappedTransition<State>[] = [];
 
   private conn: Conn;
-  private listener: (msg: string) => Promise<void>;
   private futureStore = new Map<string, Future<any>>();
 
   constructor(thingId: string, conn: Conn, defaultState: State) {
     this.thingId = thingId;
     this.conn = conn;
     this.state = defaultState;
-    this.listener = async msg => {
-      try {
-        const message = Messages.validate(msg);
-        if (Messages.isReply(message)) {
-          if (this.futureStore.has(message.replyTo)) {
-            this.futureStore.get(message.replyTo)?.resolve(message);
-            this.futureStore.delete(message.replyTo);
-          }
-          return;
-        }
-
-        if (message.to != this.thingId) {
-          return;
-        }
-        this.state = await this.handleMessage(message);
-      } catch (err) {
-        console.log(`Error parsing message: ${err}`);
-      }
-    };
   }
 
-  start(): void {
-    this.conn.onOpen(async () => {
-      await this.onStart();
-      this.conn.onMessage(this.listener);
-    });
+  start() {
+    this.conn
+      .start()
+      .then(() => this.onStart())
+      .then(() => {
+        this.conn.onMessage(async msgStr => {
+          try {
+            const msg = Messages.validate(msgStr);
+            if (Messages.isReply(msg)) {
+              if (this.futureStore.has(msg.replyTo)) {
+                this.futureStore.get(msg.replyTo)?.resolve(msg);
+                this.futureStore.delete(msg.replyTo);
+              }
+              return;
+            }
+
+            if (msg.to != this.thingId) {
+              return;
+            }
+            this.state = await this.handleMessage(msg);
+          } catch (err) {
+            console.log(`Error parsing message: ${err}`);
+          }
+        });
+      });
   }
 
   stop(): void {
@@ -58,9 +58,7 @@ export class Actor<
     );
   }
 
-  async send<P>(
-    msg: TellMessage<P> | AskMessage<P> | ReplyMessage<P>
-  ): Promise<void> {
+  async send<P>(msg: TellMessage<P> | AskMessage<P> | ReplyMessage<P>) {
     await this.conn.send(
       JSON.stringify({
         from: this.thingId,
@@ -69,7 +67,7 @@ export class Actor<
     );
   }
 
-  async tell(msg: Output): Promise<void> {
+  async tell(msg: Output) {
     await this.send({
       to: msg.to,
       topic: msg.topic,
@@ -89,11 +87,7 @@ export class Actor<
     return await promise;
   }
 
-  async respond<P, R>(
-    msg: AskMessage<P>,
-    payload: R,
-    status?: number
-  ): Promise<void> {
+  async respond<P, R>(msg: AskMessage<P>, payload: R, status?: number) {
     // Responding to ask messages is not recommended, either.
     const resp = Messages.reply(msg, payload, status);
     await this.send(resp);
@@ -120,15 +114,11 @@ export class Actor<
     return this.state;
   }
 
-  protected async onStart(): Promise<void> {}
+  protected async onStart() {}
 
-  protected async onReceive(
-    _: TellMessage<any> | AskMessage<any>
-  ): Promise<void> {}
+  protected async onReceive(_: TellMessage<any> | AskMessage<any>) {}
 
-  protected async onUnknown(
-    msg: TellMessage<any> | AskMessage<any>
-  ): Promise<void> {
+  protected async onUnknown(msg: TellMessage<any> | AskMessage<any>) {
     console.log(`Received unknown message: ${msg.topic}`);
   }
 
