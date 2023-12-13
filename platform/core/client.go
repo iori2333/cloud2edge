@@ -4,17 +4,19 @@ import (
 	"actors/utils"
 	"errors"
 	"log"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
 
 type Client struct {
-	name    string
-	conn    *websocket.Conn
-	recv    chan *Message
-	closed  chan struct{}
-	pending map[string]*utils.Future[Message]
-	onErr   ClientErrorHandler
+	name     string
+	conn     *websocket.Conn
+	sendLock sync.Mutex
+	recv     chan *Message
+	closed   chan struct{}
+	pending  map[string]*utils.Future[Message]
+	onErr    ClientErrorHandler
 }
 
 type ClientErrorHandler func(*Client, error)
@@ -30,12 +32,13 @@ func NewClient(name string, conn *websocket.Conn, errorHandler ClientErrorHandle
 	}
 
 	c := &Client{
-		name:    name,
-		conn:    conn,
-		recv:    make(chan *Message, 10),
-		closed:  make(chan struct{}),
-		pending: make(map[string]*utils.Future[Message]),
-		onErr:   errorHandler,
+		name:     name,
+		conn:     conn,
+		recv:     make(chan *Message, 10),
+		sendLock: sync.Mutex{},
+		closed:   make(chan struct{}),
+		pending:  make(map[string]*utils.Future[Message]),
+		onErr:    errorHandler,
 	}
 
 	go c.runRecv()
@@ -75,6 +78,10 @@ func (c *Client) Write(msg *Message) error {
 	if err != nil {
 		return err
 	}
+
+	defer c.sendLock.Unlock()
+	c.sendLock.Lock()
+
 	return c.conn.WriteMessage(websocket.TextMessage, rawMsg)
 }
 
