@@ -8,6 +8,7 @@ type CaptureResult = {
 };
 
 const TMP_PATH = "/tmp/__output";
+const PIC_POOL_SIZE = 10;
 const BASE64_REGEX = /^data:image\/png;base64,/;
 
 class Capture implements CapacityOptions<CapturePayload, CaptureResult> {
@@ -30,7 +31,7 @@ class Capture implements CapacityOptions<CapturePayload, CaptureResult> {
 
   handle(_: CapturePayload): Promise<CaptureResult> {
     const ret = new Promise<CaptureResult>((resolve, reject) => {
-      this.cam.capture(TMP_PATH, (err, data) => {
+      this.cam.capture(TMP_PATH + Date.now() % PIC_POOL_SIZE, (err, data) => {
         if (err) {
           reject(err);
         } else {
