@@ -62,6 +62,9 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
 
     const buf = Buffer.from(img, "base64");
     const pic = gm(buf);
+
+    let classMap: Map<string, number> = new Map()
+
     for (const obj of pred) {
       const p = obj.bbox;
 
@@ -77,6 +80,13 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
       pic.drawText(p[0] + 10, p[1] + 25, obj.class);
 
       pic.drawText(p[0] + 10, p[1] + 50, obj.score.toFixed(2));
+
+      const lastNum = classMap.get(obj.class);
+      if (lastNum === undefined) {
+        classMap.set(obj.class, 1);
+      } else {
+        classMap.set(obj.class, lastNum + 1);
+      }
     }
 
     pic.write(`./${name}.png`, err => {
@@ -86,6 +96,12 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
       }
       console.log(`[${name}] Inference result saved.`);
     });
+
+    let classNumStr = new Date(Date.now()).toUTCString();
+    for (let [key, value] of classMap) {
+      classNumStr += `, ${key}: ${value}`         
+    }
+    console.log(classNumStr)
   }
 }
 
