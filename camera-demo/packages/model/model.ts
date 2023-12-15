@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { Capacities, CapacityOptions } from "@actors/core";
 import * as tf from "@tensorflow/tfjs-node";
-import * as cocoSsd from "@tensorflow-models/coco-ssd";
+import * as cocoSsd from "./coco-ssd";
 
 type InferencePayload = {
   img: string;

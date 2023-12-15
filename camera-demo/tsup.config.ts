@@ -10,6 +10,7 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
-  external: ["@tensorflow/tfjs-node"]
-  // noExternal: [/.*/]
+  treeshake: true,
+  external: ["@mapbox/node-pre-gyp"],
+  noExternal: ["@actors/core"]
 });
