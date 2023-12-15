@@ -48,21 +48,45 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
       return;
     }
 
+    const generateRandomColor = () => {
+      // Generate random values for red, green, and blue components
+      const red = Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+      const green = Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+      const blue = Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+    
+      // Concatenate the components to form the RGB color
+      const randomColor = `#${red}${green}${blue}`;
+    
+      return randomColor;
+    }   
+
     const buf = Buffer.from(img, "base64");
     const pic = gm(buf);
+
+    let classMap: Map<string, number> = new Map()
+
     for (const obj of pred) {
       const p = obj.bbox;
 
+      const color = generateRandomColor();
+
       pic.fill("transparent");
-      pic.stroke("#ff0000", 5);
+      pic.stroke(color, 5);
       pic.drawRectangle(p[0], p[1], p[0] + p[2], p[1] + p[3]);
 
-      pic.fill("red");
-      pic.stroke("#ff0000", 1);
+      pic.fill(color);
+      pic.stroke(color, 1);
       pic.fontSize(25);
       pic.drawText(p[0] + 10, p[1] + 25, obj.class);
 
       pic.drawText(p[0] + 10, p[1] + 50, obj.score.toFixed(2));
+
+      const lastNum = classMap.get(obj.class);
+      if (lastNum === undefined) {
+        classMap.set(obj.class, 1);
+      } else {
+        classMap.set(obj.class, lastNum + 1);
+      }
     }
 
     pic.write(`./${name}.png`, err => {
@@ -72,6 +96,12 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
       }
       console.log(`[${name}] Inference result saved.`);
     });
+
+    let classNumStr = new Date(Date.now()).toUTCString();
+    for (let [key, value] of classMap) {
+      classNumStr += `, ${key}: ${value}`         
+    }
+    console.log(classNumStr)
   }
 }
 
