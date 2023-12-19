@@ -50,20 +50,24 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
 
     const generateRandomColor = () => {
       // Generate random values for red, green, and blue components
-      const red = Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
-      const green = Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
-      const blue = Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
-    
+      const red = Math.floor(Math.random() * 256)
+        .toString(16)
+        .padStart(2, "0");
+      const green = Math.floor(Math.random() * 256)
+        .toString(16)
+        .padStart(2, "0");
+      const blue = Math.floor(Math.random() * 256)
+        .toString(16)
+        .padStart(2, "0");
       // Concatenate the components to form the RGB color
       const randomColor = `#${red}${green}${blue}`;
-    
       return randomColor;
-    }   
+    };
 
     const buf = Buffer.from(img, "base64");
     const pic = gm(buf);
 
-    let classMap: Map<string, number> = new Map()
+    const classMap: Map<string, number> = new Map();
 
     for (const obj of pred) {
       const p = obj.bbox;
@@ -98,10 +102,10 @@ class Actor extends BaseActor<ActorState, ActorTransition, ActorOutput> {
     });
 
     let classNumStr = new Date(Date.now()).toUTCString();
-    for (let [key, value] of classMap) {
-      classNumStr += `, ${key}: ${value}`         
+    for (const [key, value] of classMap) {
+      classNumStr += `, ${key}: ${value}`;
     }
-    console.log(classNumStr)
+    console.log(classNumStr);
   }
 }
 

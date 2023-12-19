@@ -31,7 +31,7 @@ class Capture implements CapacityOptions<CapturePayload, CaptureResult> {
 
   handle(_: CapturePayload): Promise<CaptureResult> {
     const ret = new Promise<CaptureResult>((resolve, reject) => {
-      this.cam.capture(TMP_PATH + Date.now() % PIC_POOL_SIZE, (err, data) => {
+      this.cam.capture(TMP_PATH + (Date.now() % PIC_POOL_SIZE), (err, data) => {
         if (err) {
           reject(err);
         } else {
