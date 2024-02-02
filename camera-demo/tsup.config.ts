@@ -11,6 +11,6 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   treeshake: true,
-  external: ["@mapbox/node-pre-gyp"],
+  external: ["@tensorflow/tfjs-node"],
   noExternal: ["@actors/core"]
 });

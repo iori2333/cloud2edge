@@ -3,6 +3,8 @@ export interface CapacityOptions<P, R> {
   handle(payload: P): Promise<R>;
 }
 
+export type CapacityHandler<P, R> = (payload: P) => Promise<R>;
+
 export interface Capacity<P, R> {
   name: string;
   preCheck(): boolean;
@@ -12,8 +14,16 @@ export interface Capacity<P, R> {
 export class Capacities {
   static create<P, R>(
     name: string,
-    options: CapacityOptions<P, R>
+    options: CapacityOptions<P, R> | CapacityHandler<P, R>
   ): Capacity<P, R> {
+    if (typeof options === "function") {
+      return {
+        name,
+        preCheck: () => true,
+        handle: options
+      };
+    }
+
     return {
       name,
       preCheck: options.preCheck?.bind(options) ?? (() => true),

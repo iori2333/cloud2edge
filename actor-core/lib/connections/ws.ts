@@ -37,15 +37,16 @@ export class WebsocketConn implements Conn {
     });
   }
 
-  onClose(cb: (reason: string) => void): void {
-    this.ws.once("close", (code, reason) => {
-      const parsed = `Code: ${code}, Reason: ${reason.toString()}`;
-      cb(parsed);
-    });
-  }
-
   async send(msg: string): Promise<void> {
-    this.ws.send(msg);
+    await new Promise<void>((resolve, reject) => {
+      this.ws.send(msg, err => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
   }
 
   async close(): Promise<void> {
